@@ -4,7 +4,7 @@ import { Stage1Input } from './components/Stage1Input'
 import { Stage2Review } from './components/Stage2Review'
 import { Stage3Result } from './components/Stage3Result'
 import { ConversationState, SavedConversation } from './types'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import { MessageSquare, Plus, X, Menu } from 'lucide-react'
 import { API_URL } from './config'
 
@@ -42,9 +42,12 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         setSavedConversations(data);
+      } else {
+        toast.error(`Could not load sessions (${res.status})`);
       }
     } catch (err) {
       console.error("Failed to fetch conversations", err);
+      toast.error('Could not load sessions. Check network/backend connection.');
     }
   }, []);
 
