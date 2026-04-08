@@ -1,0 +1,38 @@
+# @format
+
+have_fun: false
+
+memory_config:
+  disabled: false
+
+code_review:
+  disable: false
+
+  # Show all severities
+  comment_severity_threshold: LOW
+
+  # Unlimited comments
+  max_review_comments: -1
+
+  # Ensure severity labels appear in comments
+  review_comment:
+    include_severity: true
+
+  # Auto-review when PR opens
+  pull_request_opened:
+    help: false
+    summary: true
+    code_review: true
+    include_drafts: true
+
+  # Re-review on new commits
+  pull_request_synchronized:
+    summary: true
+    code_review: true
+
+ignore_patterns:
+  - "node_modules/**"
+  - "vendor/**"
+  - "dist/**"
+  - ".next/**"
+  - "build/**"
