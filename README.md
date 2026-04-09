@@ -11,7 +11,7 @@
 *   **Automated Peer Review:** Each "model" critiques the others to catch hallucinations and bias.
 *   **Sovereign Synthesis:** A "Chairman" model aggregates the reviews into a final consensus answer.
 *   **Responsive UI:** Fully adaptive design for Desktop, Tablet, and Mobile.
-*   **Session Persistence:** Automatically saves your conversations to local storage.
+*   **Session Persistence:** Saves conversations on the backend (SQLite), with optional persistent volume in production.
 *   **Export & Management:** Delete sessions, view history, and export findings.
 
 ---
@@ -86,5 +86,97 @@ cd client
 npm install
 npm run dev
 ```
+
+---
+
+## Deployment (Railway + Vercel)
+
+This project is set up to run with:
+
+*   **Backend on Railway** (FastAPI)
+*   **Frontend on Vercel** (Vite/React)
+*   **Vercel proxy rewrite** for `/api/*` requests to Railway
+
+### 1) Deploy Backend on Railway
+
+1. Create a new Railway service from this repository.
+2. Set the service root to `server/`.
+3. Set the start command:
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+4. Add environment variables in Railway:
+
+```ini
+GEMINI_API_KEY=...
+# OR use custom endpoint credentials:
+# GEMINI_CUSTOM_KEY=...
+# GEMINI_CUSTOM_ENDPOINT=...
+
+GEMINI_MODEL=gemini-3.1-pro-preview
+LOG_LEVEL=INFO
+CORS_ALLOWED_ORIGINS=https://your-vercel-domain.vercel.app
+SESSIONS_DB_PATH=/data/sessions.db
+```
+
+5. Add a Railway Volume:
+
+*   Mount path: `/data`
+*   This keeps `sessions.db` persistent across restarts/redeploys.
+
+### 2) Deploy Frontend on Vercel
+
+1. Import the same GitHub repository in Vercel.
+2. Configure project:
+
+*   Root Directory: `client`
+*   Framework Preset: `Vite`
+*   Build Command: `npm run build`
+*   Output Directory: `dist`
+
+3. **Do not set** `VITE_API_URL` in Vercel for production.
+
+The frontend production config uses same-origin API calls, and Vercel handles proxying via rewrite rules.
+
+### 3) Configure Vercel Rewrite Target
+
+The file `client/vercel.json` controls API proxying.
+
+Current rule:
+
+```json
+{
+	"rewrites": [
+		{
+			"source": "/api/(.*)",
+			"destination": "https://YOUR-RAILWAY-HOST/api/$1"
+		}
+	]
+}
+```
+
+Update `destination` to your Railway public URL, commit, and redeploy Vercel.
+
+### 4) Verify Deployment
+
+1. Open frontend: `https://your-vercel-domain.vercel.app`
+2. Open API through Vercel proxy:
+
+```text
+https://your-vercel-domain.vercel.app/api/conversations
+```
+
+If this returns JSON, frontend-backend routing is correct.
+
+### 5) Common Troubleshooting
+
+*   **No sessions shown on some devices:**
+		Check `https://your-vercel-domain.vercel.app/api/conversations` first (not Railway URL directly).
+*   **CORS errors:**
+		Ensure `CORS_ALLOWED_ORIGINS` matches your Vercel domain exactly (no trailing slash).
+*   **Sessions disappear after restart:**
+		Confirm Railway volume is mounted and `SESSIONS_DB_PATH=/data/sessions.db` is set.
 
 
