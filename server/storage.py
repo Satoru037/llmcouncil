@@ -17,6 +17,19 @@ DB_PATH = os.getenv("SESSIONS_DB_PATH", os.path.join(os.path.dirname(__file__), 
 # Strict UUID validation regex
 UUID_REGEX = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
+def _normalize_created_at(value: Any) -> str:
+    if not value or not isinstance(value, str):
+        return datetime.now(timezone.utc).isoformat()
+
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).isoformat()
+    except Exception:
+        logger.warning(f"Invalid created_at timestamp '{value}', defaulting to current UTC time")
+        return datetime.now(timezone.utc).isoformat()
+
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -77,7 +90,7 @@ def _migrate_json_files_if_needed() -> None:
                 if not conv_id or not UUID_REGEX.match(conv_id):
                     continue
 
-                created_at = stored_data.get("created_at") or datetime.now(timezone.utc).isoformat()
+                created_at = _normalize_created_at(stored_data.get("created_at"))
 
                 if "data" in stored_data and isinstance(stored_data["data"], dict):
                     frontend_state = stored_data["data"]
@@ -243,7 +256,7 @@ def save_conversation(frontend_state: Dict) -> Dict:
             (conv_id,),
         ).fetchone()
         if existing:
-            created_at = existing["created_at"]
+            created_at = _normalize_created_at(existing["created_at"])
 
         conn.execute(
             """
