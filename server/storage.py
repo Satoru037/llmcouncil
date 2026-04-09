@@ -25,6 +25,7 @@ def _get_conn() -> sqlite3.Connection:
         os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
     return conn
 
 def _ensure_db() -> None:
@@ -69,7 +70,7 @@ def _migrate_json_files_if_needed() -> None:
                 if not conv_id or not UUID_REGEX.match(conv_id):
                     continue
 
-                created_at = stored_data.get("created_at") or datetime.utcnow().isoformat()
+                created_at = stored_data.get("created_at") or datetime.now(datetime.timezone.utc).isoformat()
 
                 if "data" in stored_data and isinstance(stored_data["data"], dict):
                     frontend_state = stored_data["data"]
@@ -147,8 +148,6 @@ def _migrate_json_files_if_needed() -> None:
         if migrated:
             logger.info(f"Migrated {migrated} conversation file(s) to SQLite: {DB_PATH}")
 
-_migrate_json_files_if_needed()
-
 def list_conversations() -> List[Dict]:
     _ensure_db()
     with _get_conn() as conn:
@@ -219,7 +218,7 @@ def save_conversation(frontend_state: Dict) -> Dict:
         logger.warning(f"Invalid conversation ID format attempt blocked: {conv_id}")
         return {"error": "Invalid conversation ID"}
 
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.now(datetime.timezone.utc).isoformat()
 
     title = frontend_state.get("question", "Untitled")[:50]
     current_stage = int(frontend_state.get("currentStage", 1))

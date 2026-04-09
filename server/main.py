@@ -64,6 +64,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Perform one-time database initialization and migration on startup."""
+    storage._migrate_json_files_if_needed()
+    logger.info("Database startup initialization completed")
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to LLM Council API"}
