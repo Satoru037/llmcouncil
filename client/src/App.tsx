@@ -38,7 +38,7 @@ function App() {
 		// Check for last active session
 		const lastId = localStorage.getItem("lastActiveConversationId");
 		if (lastId) {
-			loadConversation({ id: lastId } as SavedConversation);
+			loadConversation({ id: lastId });
 		}
 	}, []); // We intentionally want this to run only once on mount.
 
