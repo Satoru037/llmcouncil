@@ -17,6 +17,9 @@ build/
 # Local Data (Don't commit conversations)
 server/data/conversations/*
 !server/data/conversations/.gitkeep
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
 
 # System Files
 .DS_Store
