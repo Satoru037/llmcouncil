@@ -3,6 +3,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 import logging
+from contextlib import contextmanager
 from typing import List, Dict, Any, Optional
 import sqlite3
 
@@ -19,14 +20,18 @@ UUID_REGEX = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-def _get_conn() -> sqlite3.Connection:
+@contextmanager
+def _get_conn():
     db_dir = os.path.dirname(DB_PATH)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    return conn
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        yield conn
+    finally:
+        conn.close()
 
 def _ensure_db() -> None:
     with _get_conn() as conn:
