@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 import logging
 from contextlib import contextmanager
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 import sqlite3
 
 import re
@@ -21,7 +21,7 @@ def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
 @contextmanager
-def _get_conn():
+def _get_conn() -> Iterator[sqlite3.Connection]:
     db_dir = os.path.dirname(DB_PATH)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
@@ -29,7 +29,9 @@ def _get_conn():
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
-        yield conn
+        # Use sqlite3 transaction context so writes commit and failures rollback.
+        with conn:
+            yield conn
     finally:
         conn.close()
 
@@ -218,6 +220,7 @@ def save_conversation(frontend_state: Dict) -> Dict:
         frontend_state = frontend_state.model_dump()
     elif hasattr(frontend_state, "dict"):
         frontend_state = frontend_state.dict()
+    frontend_state = dict(frontend_state)
     
     conv_id = frontend_state.get("id") or str(uuid.uuid4())
     # Ensure ID is in the state object
