@@ -133,7 +133,7 @@ def _migrate_json_files_if_needed() -> None:
                         if stage3_result:
                             current_stage = 3
                         elif stage2_reviews:
-                            current_stage = 3
+                            current_stage = 2
                         elif stage1_responses:
                             current_stage = 2
 
