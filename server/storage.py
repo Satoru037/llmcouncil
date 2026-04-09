@@ -1,7 +1,7 @@
 import os
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from typing import List, Dict, Any, Optional
 import sqlite3
@@ -70,7 +70,7 @@ def _migrate_json_files_if_needed() -> None:
                 if not conv_id or not UUID_REGEX.match(conv_id):
                     continue
 
-                created_at = stored_data.get("created_at") or datetime.now(datetime.timezone.utc).isoformat()
+                created_at = stored_data.get("created_at") or datetime.now(timezone.utc).isoformat()
 
                 if "data" in stored_data and isinstance(stored_data["data"], dict):
                     frontend_state = stored_data["data"]
@@ -208,6 +208,11 @@ def get_conversation(conversation_id: str) -> Optional[Dict]:
 
 def save_conversation(frontend_state: Dict) -> Dict:
     _ensure_db()
+
+    if hasattr(frontend_state, "model_dump"):
+        frontend_state = frontend_state.model_dump()
+    elif hasattr(frontend_state, "dict"):
+        frontend_state = frontend_state.dict()
     
     conv_id = frontend_state.get("id") or str(uuid.uuid4())
     # Ensure ID is in the state object
@@ -218,7 +223,7 @@ def save_conversation(frontend_state: Dict) -> Dict:
         logger.warning(f"Invalid conversation ID format attempt blocked: {conv_id}")
         return {"error": "Invalid conversation ID"}
 
-    created_at = datetime.now(datetime.timezone.utc).isoformat()
+    created_at = datetime.now(timezone.utc).isoformat()
 
     title = frontend_state.get("question", "Untitled")[:50]
     current_stage = int(frontend_state.get("currentStage", 1))
