@@ -58,7 +58,7 @@ function App() {
 	}, []);
 
 	const loadConversation = useCallback(
-		async (saved: SavedConversation) => {
+		async (saved: Pick<SavedConversation, "id">) => {
 			try {
 				const res = await fetch(`${API_URL}/api/conversations/${saved.id}`);
 				if (res.ok) {
