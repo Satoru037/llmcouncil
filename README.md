@@ -12,7 +12,7 @@
 - **Automated Peer Review:** Each "model" critiques the others to catch hallucinations and bias.
 - **Sovereign Synthesis:** A "Chairman" model aggregates the reviews into a final consensus answer.
 - **Responsive UI:** Fully adaptive design for Desktop, Tablet, and Mobile.
-- **Session Persistence:** Saves conversations on the backend (SQLite), with optional persistent volume in production.
+- **Session Persistence:** Saves conversations in Turso (production) with automatic local SQLite fallback for development.
 - **Export & Management:** Delete sessions, view history, and export findings.
 
 ---
@@ -129,6 +129,13 @@ GEMINI_CUSTOM_ENDPOINT=...
 GEMINI_MODEL=gemini-3.1-pro-preview
 LOG_LEVEL=INFO
 CORS_ALLOWED_ORIGINS=https://your-vercel-domain.vercel.app
+TURSO_DATABASE_URL=libsql://your-db-name-your-org.turso.io
+TURSO_AUTH_TOKEN=...
+```
+
+Optional fallback for local SQLite (dev/testing only):
+
+```ini
 SESSIONS_DB_PATH=/opt/render/project/src/server/data/sessions.db
 ```
 
@@ -136,7 +143,17 @@ SESSIONS_DB_PATH=/opt/render/project/src/server/data/sessions.db
 
 `https://your-render-service.onrender.com`
 
-Note: Render free tier does not include persistent disk. SQLite data may reset after restarts/redeploys.
+Note: Render free tier does not include persistent disk. Use Turso variables above for durable data across restarts/redeploys.
+
+### 1.1) Create Turso Database (for persistent sessions)
+
+1. Create a database in Turso dashboard.
+2. Open the database and copy the **Database URL** from the **Connect** section.
+3. Click **Create Token** and create a **Read & Write** token.
+4. Add both values to Render as:
+
+- `TURSO_DATABASE_URL`
+- `TURSO_AUTH_TOKEN`
 
 ### 2) Deploy Frontend on Vercel
 
