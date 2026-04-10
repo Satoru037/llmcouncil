@@ -24,6 +24,7 @@ function App() {
 	const [savedConversations, setSavedConversations] = useState<
 		SavedConversation[]
 	>([]);
+	const [isLoadingSessions, setIsLoadingSessions] = useState(true);
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 	// Confirmation Modal State
@@ -43,6 +44,7 @@ function App() {
 	}, []); // We intentionally want this to run only once on mount.
 
 	const fetchConversations = useCallback(async () => {
+		setIsLoadingSessions(true);
 		try {
 			const res = await fetch(`${API_URL}/api/conversations`);
 			if (res.ok) {
@@ -54,6 +56,8 @@ function App() {
 		} catch (err) {
 			console.error("Failed to fetch conversations", err);
 			toast.error("Could not load sessions. Check network/backend connection.");
+		} finally {
+			setIsLoadingSessions(false);
 		}
 	}, []);
 
@@ -192,7 +196,14 @@ function App() {
 						Recent Sessions
 					</h3>
 					<div className='space-y-2'>
-						{savedConversations.length === 0 ? (
+						{isLoadingSessions ? (
+							Array.from({ length: 5 }).map((_, index) => (
+								<div
+									key={index}
+									className='h-9 rounded bg-gray-200 session-skeleton'
+								/>
+							))
+						) : savedConversations.length === 0 ? (
 							<div className='text-sm text-gray-400 italic'>
 								No saved sessions
 							</div>
