@@ -2,7 +2,7 @@
 	"rewrites": [
 		{
 			"source": "/api/(.*)",
-			"destination": "${RAILWAY_API_URL}/api/$1"
+			"destination": "https://llmcouncil-api-6ziy.onrender.com/api/$1"
 		}
 	]
 }
