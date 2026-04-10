@@ -9,10 +9,17 @@ import sqlite3
 
 import re
 
+try:
+    import libsql
+except ImportError:
+    libsql = None
+
 logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "conversations")
 DB_PATH = os.getenv("SESSIONS_DB_PATH", os.path.join(os.path.dirname(__file__), "data", "sessions.db"))
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 # Strict UUID validation regex
 UUID_REGEX = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
@@ -33,18 +40,48 @@ def _normalize_created_at(value: Any) -> str:
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
+def _row_to_dict(cursor: Any, row: Any) -> Optional[Dict[str, Any]]:
+    if row is None:
+        return None
+    if isinstance(row, sqlite3.Row):
+        return dict(row)
+    if isinstance(row, dict):
+        return row
+    if hasattr(row, "keys"):
+        return {k: row[k] for k in row.keys()}
+
+    columns = [col[0] for col in (cursor.description or [])]
+    if isinstance(row, (list, tuple)) and columns:
+        return {columns[i]: row[i] for i in range(min(len(columns), len(row)))}
+    return None
+
 @contextmanager
-def _get_conn() -> Iterator[sqlite3.Connection]:
-    db_dir = os.path.dirname(DB_PATH)
-    if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+def _get_conn() -> Iterator[Any]:
+    if TURSO_DATABASE_URL:
+        if libsql is None:
+            raise RuntimeError("TURSO_DATABASE_URL is set but 'libsql' package is not installed")
+        conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+    else:
+        db_dir = os.path.dirname(DB_PATH)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+
     try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        # Use sqlite3 transaction context so writes commit and failures rollback.
-        with conn:
-            yield conn
+        if not TURSO_DATABASE_URL:
+            conn.execute("PRAGMA journal_mode=WAL;")
+        yield conn
+        try:
+            conn.commit()
+        except Exception:
+            pass
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -72,8 +109,9 @@ def _migrate_json_files_if_needed() -> None:
     _ensure_db()
 
     with _get_conn() as conn:
-        row = conn.execute("SELECT COUNT(1) AS count FROM conversations").fetchone()
-        if row and int(row["count"]) > 0:
+        count_cur = conn.execute("SELECT COUNT(1) AS count FROM conversations")
+        row = _row_to_dict(count_cur, count_cur.fetchone())
+        if row and int(row.get("count", 0)) > 0:
             return
 
         migrated = 0
@@ -166,27 +204,29 @@ def _migrate_json_files_if_needed() -> None:
                 logger.warning(f"Skipping migration for {filename}: {e}")
 
         if migrated:
-            logger.info(f"Migrated {migrated} conversation file(s) to SQLite: {DB_PATH}")
+            logger.info(f"Migrated {migrated} conversation file(s) into conversations table")
 
 def list_conversations() -> List[Dict]:
     _ensure_db()
     with _get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             """
             SELECT id, title, created_at
             FROM conversations
             ORDER BY created_at DESC
             """
-        ).fetchall()
+        )
+        rows = [_row_to_dict(cur, row) for row in cur.fetchall()]
 
     return [
         {
-            "id": row["id"],
-            "title": row["title"] or "Untitled",
-            "created_at": row["created_at"],
+            "id": row.get("id"),
+            "title": row.get("title") or "Untitled",
+            "created_at": row.get("created_at"),
             "data": None,
         }
         for row in rows
+        if row is not None
     ]
 
 def get_conversation(conversation_id: str) -> Optional[Dict]:
@@ -199,27 +239,28 @@ def get_conversation(conversation_id: str) -> Optional[Dict]:
 
     try:
         with _get_conn() as conn:
-            row = conn.execute(
+            cur = conn.execute(
                 """
                 SELECT id, title, created_at, current_stage, data_json
                 FROM conversations
                 WHERE id = ?
                 """,
                 (conversation_id,),
-            ).fetchone()
+            )
+            row = _row_to_dict(cur, cur.fetchone())
 
         if row is None:
             return None
 
-        data = json.loads(row["data_json"])
-        data["id"] = row["id"]
+        data = json.loads(row.get("data_json", "{}"))
+        data["id"] = row.get("id")
         if "currentStage" not in data:
-            data["currentStage"] = int(row["current_stage"])
+            data["currentStage"] = int(row.get("current_stage", 1))
 
         return {
-            "id": row["id"],
-            "title": row["title"],
-            "created_at": row["created_at"],
+            "id": row.get("id"),
+            "title": row.get("title"),
+            "created_at": row.get("created_at"),
             "data": data,
         }
     except Exception as e:
@@ -251,12 +292,13 @@ def save_conversation(frontend_state: Dict) -> Dict:
 
     # Preserve created_at for updates.
     with _get_conn() as conn:
-        existing = conn.execute(
+        cur = conn.execute(
             "SELECT created_at FROM conversations WHERE id = ?",
             (conv_id,),
-        ).fetchone()
+        )
+        existing = _row_to_dict(cur, cur.fetchone())
         if existing:
-            created_at = _normalize_created_at(existing["created_at"])
+            created_at = _normalize_created_at(existing.get("created_at"))
 
         conn.execute(
             """
