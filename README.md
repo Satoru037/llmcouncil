@@ -101,19 +101,26 @@ npm run dev
 
 ---
 
-## Deployment (Railway + Vercel)
+## Deployment (Render + Vercel)
 
 This project is set up to run with:
 
-- **Backend on Railway** (FastAPI)
+- **Backend on Render** (FastAPI)
 - **Frontend on Vercel** (Vite/React)
-- **Vercel proxy rewrite** for `/api/*` requests to Railway
+- **Vercel proxy rewrite** for `/api/*` requests to Render
 
-### 1) Deploy Backend on Railway
+### 1) Deploy Backend on Render
 
-1. Create a new Railway service from this repository.
-2. Set the service root to `server/`.
-3. Add environment variables in Railway:
+1. Create a new **Web Service** on Render from this repository.
+2. Set these service options:
+
+- Language: `Python 3`
+- Branch: `main`
+- Root Directory: `server`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+3. Add environment variables in Render:
 
 ```ini
 GEMINI_API_KEY=...
@@ -122,13 +129,14 @@ GEMINI_CUSTOM_ENDPOINT=...
 GEMINI_MODEL=gemini-3.1-pro-preview
 LOG_LEVEL=INFO
 CORS_ALLOWED_ORIGINS=https://your-vercel-domain.vercel.app
-SESSIONS_DB_PATH=/data/sessions.db
+SESSIONS_DB_PATH=/opt/render/project/src/server/data/sessions.db
 ```
 
-4. Add a Railway Volume:
+4. Deploy the Render service and copy the generated URL, for example:
 
-- Mount path: `/data`
-- This keeps `sessions.db` persistent across restarts/redeploys.
+`https://your-render-service.onrender.com`
+
+Note: Render free tier does not include persistent disk. SQLite data may reset after restarts/redeploys.
 
 ### 2) Deploy Frontend on Vercel
 
@@ -151,13 +159,13 @@ Current rule:
 	"rewrites": [
 		{
 			"source": "/api/(.*)",
-			"destination": "https://YOUR-RAILWAY-HOST/api/$1"
+			"destination": "https://YOUR-RENDER-HOST/api/$1"
 		}
 	]
 }
 ```
 
-Update `destination` to your Railway public URL, commit, and redeploy Vercel.
+Update `destination` to your Render public URL, commit, and redeploy Vercel.
 
 ### 4) Verify Deployment
 
